@@ -2,12 +2,17 @@ using UnityEngine;
 
 public class PerlinNoise : MonoBehaviour
 {
-    public float[,] GenerateMap(int width, int height, float scale, float octaves, float persistance, float lacunarity, float xOrg, float yOrg)
+    [SerializeField] private float scale = 1.0f;
+    [SerializeField] private int octaves = 3;
+    [SerializeField] private float persistance = 0.5f;
+    [SerializeField] private float lacunarity = 2;
+
+    public float[,] GetNoise(float orgX, float orgY, int width, int height, int posX, int posY)
     {
         float[,] noiseMap = new float[width, height];
         scale = Mathf.Max(0.0001f, scale);
-        float maxNoiseHeight = float.MinValue; //최대 값을 담기 위한 변수
-        float minNoiseHeight = float.MaxValue; //최소 값을 담기 위한 변수
+        float maxNoiseHeight = 1; //최대 값을 담기 위한 변수
+        float minNoiseHeight = -1; //최소 값을 담기 위한 변수
         for (int x = 0; x < width; x++)
         {
             for (int y = 0; y < height; y++)
@@ -18,15 +23,15 @@ public class PerlinNoise : MonoBehaviour
 
                 for (int i = 0; i < octaves; i++) //옥타브가 증가할수록 높은 주파수와 낮은 진폭의 노이즈가 중첩됨.
                 {
-                    float xCoord = xOrg + x / scale * frequency;
-                    float yCoord = yOrg + y / scale * frequency;
+                    float xCoord = orgX + (posX + x) / scale * frequency;
+                    float yCoord = orgY + (posY + y) / scale * frequency;
                     float perlinValue = Mathf.PerlinNoise(xCoord, yCoord) * 2 - 1; //0~1 사이의 값을 반환하는 함수. 2를 곱하고 1을 빼서 -1~1 사이의 값으로 변환
                     noiseHeight += perlinValue * amplitude;
                     amplitude *= persistance;
                     frequency *= lacunarity;
                 }
-                if (noiseHeight > maxNoiseHeight) maxNoiseHeight = noiseHeight;
-                else if (noiseHeight < minNoiseHeight) minNoiseHeight = noiseHeight;
+                //if (noiseHeight > maxNoiseHeight) maxNoiseHeight = noiseHeight;
+                //else if (noiseHeight < minNoiseHeight) minNoiseHeight = noiseHeight;
                 noiseMap[x, y] = noiseHeight;
             }
         }
