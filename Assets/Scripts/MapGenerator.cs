@@ -27,12 +27,13 @@ public class MapGenerator : MonoBehaviour
     [Header("Map Setting")]
     [SerializeField] private int width;
     [SerializeField] private int height;
-    [SerializeField] private int row;
-    [SerializeField] private int col;
     [SerializeField] private Vector2Int mapOffeset;
-    [SerializeField] private bool useHeightMap;
+    [Space(10)]
+    [SerializeField] private int layerNum = 10;
+    [Space(10)]
     [SerializeField] private bool showAllMap;
     [SerializeField] private Vector2Int mapInterval;
+    [Space(10)]
     [SerializeField] private int seed;
     [SerializeField] private bool useRandomSeed;
     private float groundOrgX = 0;
@@ -43,18 +44,8 @@ public class MapGenerator : MonoBehaviour
     [Header("Tilemap Setting")]
     [SerializeField] private Tilemap groundTilemap;
     [SerializeField] private Tilemap landformTilemap;
-    [Space(10)]
-    [SerializeField] private Tilemap tilemapPrefab;
-    [SerializeField] private int layerNum = 10;
-    [SerializeField] private Transform groundParentTransform;
-    [SerializeField] private Transform landformParentTransform;
-    [SerializeField] private float zOffset = 1;
-    [SerializeField] private float landformOffset = 2;
-    private Tilemap[] groundTilemaps;
-    private Tilemap[] landformTilemaps;
 
     [Header("Components")]
-    [SerializeField] private TileManager tileManager;
     [SerializeField] private PerlinNoise perlinNoise;
 
     [Header("Tiles")]
@@ -65,23 +56,9 @@ public class MapGenerator : MonoBehaviour
 
     private void Start()
     {
-        if (useHeightMap)
-        {
-            groundTilemaps = new Tilemap[layerNum];
-            landformTilemaps = new Tilemap[layerNum];
-            for (int i = 0; i < layerNum; i++)
-            {
-                groundTilemaps[i] = Instantiate(tilemapPrefab, groundParentTransform);
-                groundTilemaps[i].tileAnchor = new Vector3(groundTilemaps[i].tileAnchor.x, groundTilemaps[i].tileAnchor.y, i * zOffset);
-
-                landformTilemaps[i] = Instantiate(tilemapPrefab, landformParentTransform);
-                landformTilemaps[i].tileAnchor = new Vector3(groundTilemaps[i].tileAnchor.x, groundTilemaps[i].tileAnchor.y, i * zOffset + landformOffset);
-            }
-        }
-
         Setup();
         ClearMap();
-        GenerateMap(0, 0);
+        ShowMap(GenerateMap(currentPos));
     }
 
     private void Update()
@@ -90,7 +67,7 @@ public class MapGenerator : MonoBehaviour
         {
             Setup();
             ClearMap();
-            GenerateMap(0, 0);
+            ShowMap(GenerateMap(currentPos));
         }
 
         if (Input.GetKeyDown(KeyCode.UpArrow))
@@ -125,15 +102,12 @@ public class MapGenerator : MonoBehaviour
     private void MoveMap(Vector2Int direction)
     {
         if (!showAllMap) ClearMap();
-        List<MapData> mapDataList = mapDatas.Where(x => x.pos == currentPos + direction).ToList();
-        if (mapDataList.Count == 0)
+        MapData mapData = mapDatas.FirstOrDefault(x => x.pos == currentPos + direction);
+        if (mapData == null)
         {
-            GenerateMap(currentPos.x + direction.x, currentPos.y + direction.y);
+            mapData = GenerateMap(currentPos + direction);
         }
-        else
-        {
-            ShowMap(mapDataList[0]);
-        }
+        ShowMap(mapData);
         currentPos += direction;
     }
 
@@ -151,27 +125,16 @@ public class MapGenerator : MonoBehaviour
 
     private void ClearMap()
     {
-        if (!useHeightMap)
-        {
-            groundTilemap.ClearAllTiles();
-            landformTilemap.ClearAllTiles();
-        }
-        else
-        {
-            for (int i = 0; i < layerNum; i++)
-            {
-                groundTilemaps[i].ClearAllTiles();
-                landformTilemaps[i].ClearAllTiles();
-            }
-        }
+        groundTilemap.ClearAllTiles();
+        landformTilemap.ClearAllTiles();
     }
 
-    public void GenerateMap(int posX, int posY)
+    private MapData GenerateMap(Vector2Int pos)
     {
         MapData mapData = new MapData();
         mapData.ground = new TileData[width, height];
         mapData.landform = new TileData[width, height];
-        mapData.pos = new Vector2Int(posX, posY);
+        mapData.pos = new Vector2Int(pos.x, pos.y);
         for (int x = 0; x < width; x++)
         {
             for (int y = 0; y < height; y++)
@@ -181,8 +144,8 @@ public class MapGenerator : MonoBehaviour
             }
         }
 
-        float[,] groundNoiseMap = perlinNoise.GetNoise(groundOrgX, groundOrgY, width, height, posX * width, posY * height);
-        float[,] landformNoiseMap = perlinNoise.GetNoise(landformOrgX, landformOrgX, width, height, posX * width, posY * height);
+        float[,] groundNoiseMap = perlinNoise.GetNoise(groundOrgX, groundOrgY, width, height, pos.x * width, pos.y * height);
+        float[,] landformNoiseMap = perlinNoise.GetNoise(landformOrgX, landformOrgY, width, height, pos.x * width, pos.y * height);
 
         for (int x = 0; x < width; x++)
         {
@@ -215,7 +178,7 @@ public class MapGenerator : MonoBehaviour
 
         mapDatas.Add(mapData);
 
-        ShowMap(mapData);
+        return mapData;
     }
 
     private void ShowMap(MapData mapData)
@@ -231,21 +194,18 @@ public class MapGenerator : MonoBehaviour
                     newPosition += new Vector3Int(mapData.pos.x * (width + mapInterval.x), mapData.pos.y * (height + mapInterval.y), 0);
                 }
 
-                Tilemap ground = groundTilemap;
-                Tilemap landform = landformTilemap;
-
-                if (useHeightMap)
-                {
-                    if (mapData.ground[x, y] != null)
-                        ground = groundTilemaps[Mathf.FloorToInt(mapData.ground[x, y].height * (layerNum - 1))];
-                    if (mapData.landform[x, y] != null)
-                        landform = landformTilemaps[Mathf.FloorToInt(mapData.landform[x, y].height * (layerNum - 1))];
-                }
-
                 if (mapData.ground[x, y] != null)
-                    ground.SetTile(newPosition, mapData.ground[x, y].data.tile);
+                {
+                    newPosition.z = Mathf.FloorToInt(mapData.ground[x, y].height * layerNum);
+                    groundTilemap.SetTileFlags(newPosition, TileFlags.None);
+                    groundTilemap.SetTile(newPosition, mapData.ground[x, y].data.tile);
+                }
                 if (mapData.landform[x, y] != null)
-                    landform.SetTile(newPosition, mapData.landform[x, y].data.tile);
+                {
+                    newPosition.z = Mathf.FloorToInt(mapData.landform[x, y].height * layerNum);
+                    groundTilemap.SetTileFlags(newPosition, TileFlags.None);
+                    landformTilemap.SetTile(newPosition, mapData.landform[x, y].data.tile);
+                }
             }
         }
     }
