@@ -10,10 +10,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 13312, guid: 0000000000000000e000000000000000, type: 0}
-  m_Name: TileMark
+  m_Name: Isometric_Basic_11
   m_EditorClassIdentifier: 
-  m_Sprite: {fileID: 21300000, guid: ec00eca08f11c0349afa1f37073b6320, type: 3}
-  m_Color: {r: 1, g: 1, b: 1, a: 0.5019608}
+  m_Sprite: {fileID: 7538167828836833066, guid: bec46a845b1a6e94588a0e5666c3ef30, type: 3}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_Transform:
     e00: 1
     e01: 0

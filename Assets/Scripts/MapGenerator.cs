@@ -6,28 +6,60 @@ using System.Linq;
 public class TileData
 {
     public Data data;
-    public float height;
+    public Vector3Int pos;
 
-    public TileData(Data data, float height)
+    public TileData(Vector3Int pos, Data data)
     {
+        this.pos = pos;
         this.data = data;
-        this.height = height;
     }
 }
 
 public class MapData
 {
-    public TileData[,] ground;
-    public TileData[,] landform;
+    public List<TileData> ground;
+    public List<TileData> landform;
     public Vector2Int pos;
+}
+
+public static class ExtensionMethod
+{
+    public static TileData Get(this List<TileData> tileDatas, Vector2Int pos)
+    {
+        return tileDatas.FirstOrDefault(t => t.pos.x == pos.x && t.pos.y == pos.y);
+    }
+}
+
+public class EntityData
+{
+    public List<EntityController> entity = new List<EntityController>();
+
+    public EntityController Get(Vector2Int pos)
+    {
+        return entity.FirstOrDefault(n => n.currentPos.x == pos.x && n.currentPos.y == pos.y);
+    }
 }
 
 public class MapGenerator : MonoBehaviour
 {
+    public static MapGenerator Instance
+    {
+        get
+        {
+            if (instance == null)
+            {
+                instance = FindObjectOfType<MapGenerator>();
+            }
+            return instance;
+        }
+    }
+    private static MapGenerator instance;
+
     [Header("Map Setting")]
     [SerializeField] private int width;
     [SerializeField] private int height;
     [SerializeField] private Vector2Int mapOffeset;
+    [SerializeField] private bool useHeightMap;
     [Space(10)]
     [SerializeField] private int layerNum = 10;
     [Space(10)]
@@ -42,8 +74,8 @@ public class MapGenerator : MonoBehaviour
     private float landformOrgY = 0;
 
     [Header("Tilemap Setting")]
-    [SerializeField] private Tilemap groundTilemap;
-    [SerializeField] private Tilemap landformTilemap;
+    public Tilemap groundTilemap;
+    public Tilemap landformTilemap;
 
     [Header("Components")]
     [SerializeField] private PerlinNoise perlinNoise;
@@ -52,7 +84,16 @@ public class MapGenerator : MonoBehaviour
     [SerializeField] private Data[] tiles;
 
     private List<MapData> mapDatas;
+    public EntityData entityData;
     private Vector2Int currentPos;
+
+    private void Awake()
+    {
+        if (Instance != this)
+        {
+            Destroy(gameObject);
+        }
+    }
 
     private void Start()
     {
@@ -132,17 +173,9 @@ public class MapGenerator : MonoBehaviour
     private MapData GenerateMap(Vector2Int pos)
     {
         MapData mapData = new MapData();
-        mapData.ground = new TileData[width, height];
-        mapData.landform = new TileData[width, height];
+        mapData.ground = new List<TileData>();
+        mapData.landform = new List<TileData>();
         mapData.pos = new Vector2Int(pos.x, pos.y);
-        for (int x = 0; x < width; x++)
-        {
-            for (int y = 0; y < height; y++)
-            {
-                mapData.ground[x, y] = null;
-                mapData.landform[x, y] = null;
-            }
-        }
 
         float[,] groundNoiseMap = perlinNoise.GetNoise(groundOrgX, groundOrgY, width, height, pos.x * width, pos.y * height);
         float[,] landformNoiseMap = perlinNoise.GetNoise(landformOrgX, landformOrgY, width, height, pos.x * width, pos.y * height);
@@ -151,27 +184,29 @@ public class MapGenerator : MonoBehaviour
         {
             for (int y = 0; y < height; y++)
             {
-                if (groundNoiseMap[x, y] <= tiles[(int)TileName.water].prob)
+                Vector2Int p = new Vector2Int(x - width / 2 + mapOffeset.x, y - height / 2 + mapOffeset.y);
+
+                if (groundNoiseMap[x, y] < tiles[(int)TileName.water].prob)
                 {
-                    mapData.ground[x, y] = new TileData(tiles[(int)TileName.water], tiles[(int)TileName.water].prob);
+                    mapData.ground.Add(new TileData(new Vector3Int(p.x, p.y, Mathf.FloorToInt(tiles[(int)TileName.water].prob) * layerNum + 1), tiles[(int)TileName.water]));
                 }
                 else
                 {
-                    mapData.ground[x, y] = new TileData(tiles[(int)TileName.grass], groundNoiseMap[x, y]);
+                    mapData.ground.Add(new TileData(new Vector3Int(p.x, p.y, Mathf.FloorToInt(groundNoiseMap[x, y] * layerNum)), tiles[(int)TileName.grass]));
                 }
 
                 if (groundNoiseMap[x, y] >= tiles[(int)TileName.mountain].prob)
                 {
-                    mapData.landform[x, y] = new TileData(tiles[(int)TileName.mountain], groundNoiseMap[x, y]);
+                    mapData.landform.Add(new TileData(new Vector3Int(p.x, p.y, Mathf.FloorToInt(groundNoiseMap[x, y] * layerNum)), tiles[(int)TileName.mountain]));
                 }
 
-                if (landformNoiseMap[x, y] <= tiles[(int)TileName.forest].prob && mapData.ground[x, y].data.name == TileName.grass)
+                if (landformNoiseMap[x, y] <= tiles[(int)TileName.forest].prob && mapData.ground.Get(p).data.name == TileName.grass)
                 {
-                    mapData.landform[x, y] = new TileData(tiles[(int)TileName.forest], groundNoiseMap[x, y]);
+                    mapData.landform.Add(new TileData(new Vector3Int(p.x, p.y, Mathf.FloorToInt(groundNoiseMap[x, y] * layerNum)), tiles[(int)TileName.forest]));
                 }
-                else if (landformNoiseMap[x, y] <= tiles[(int)TileName.tree].prob && mapData.ground[x, y].data.name == TileName.grass)
+                else if (landformNoiseMap[x, y] <= tiles[(int)TileName.tree].prob && mapData.ground.Get(p).data.name == TileName.grass)
                 {
-                    mapData.landform[x, y] = new TileData(tiles[(int)TileName.tree], groundNoiseMap[x, y]);
+                    mapData.landform.Add(new TileData(new Vector3Int(p.x, p.y, Mathf.FloorToInt(groundNoiseMap[x, y] * layerNum)), tiles[(int)TileName.tree]));
                 }
             }
         }
@@ -188,25 +223,55 @@ public class MapGenerator : MonoBehaviour
             for (int y = 0; y < height; y++)
             {
                 Vector3Int newPosition = new Vector3Int(x - width / 2 + mapOffeset.x, y - height / 2 + mapOffeset.y, 0);
+                Vector2Int p = new Vector2Int(newPosition.x, newPosition.y);
 
-                if (showAllMap)
-                {
-                    newPosition += new Vector3Int(mapData.pos.x * (width + mapInterval.x), mapData.pos.y * (height + mapInterval.y), 0);
-                }
+                if (showAllMap) newPosition += new Vector3Int(mapData.pos.x * (width + mapInterval.x), mapData.pos.y * (height + mapInterval.y), 0);
 
-                if (mapData.ground[x, y] != null)
+                if (mapData.ground.Get(p) != null)
                 {
-                    newPosition.z = Mathf.FloorToInt(mapData.ground[x, y].height * layerNum);
+                    newPosition.z = GetTileHeight(mapData.ground.Get(p));
                     groundTilemap.SetTileFlags(newPosition, TileFlags.None);
-                    groundTilemap.SetTile(newPosition, mapData.ground[x, y].data.tile);
+                    groundTilemap.SetTile(newPosition, mapData.ground.Get(p).data.tile);
                 }
-                if (mapData.landform[x, y] != null)
+                if (mapData.landform.Get(p) != null)
                 {
-                    newPosition.z = Mathf.FloorToInt(mapData.landform[x, y].height * layerNum);
+                    newPosition.z = GetTileHeight(mapData.landform.Get(p));
                     groundTilemap.SetTileFlags(newPosition, TileFlags.None);
-                    landformTilemap.SetTile(newPosition, mapData.landform[x, y].data.tile);
+                    landformTilemap.SetTile(newPosition, mapData.landform.Get(p).data.tile);
                 }
             }
         }
+    }
+
+    public MapData GetMapData()
+    {
+        return mapDatas.FirstOrDefault(x => x.pos == currentPos);
+    }
+
+    public int GetTileHeight(TileData tileData)
+    {
+        if (useHeightMap) return tileData.pos.z;
+        else return 0;
+    }
+
+    public bool UseHeightMap()
+    {
+        return useHeightMap;
+    }
+
+    public bool IsMovableTile(Vector3Int position)
+    {
+        if (!useHeightMap) position.z = 0;
+
+        TileData tileData = GetMapData().ground.Get(new Vector2Int(position.x, position.y));
+        if (tileData == null) return false;
+        if (tileData.data.moveType == TileMoveType.block) return false;
+
+        tileData = GetMapData().landform.Get(new Vector2Int(position.x, position.y));
+        if (tileData != null && tileData.data.moveType == TileMoveType.block) return false;
+
+        if (entityData.Get(new Vector2Int(position.x, position.y)) != null) return false;
+
+        return true;
     }
 }
